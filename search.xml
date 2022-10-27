@@ -4,6 +4,35 @@
   
     
     <entry>
+      <title>二分搜索-在D天内送达包裹的能力</title>
+      <link href="/guaBlog/2022/10/27/algorithm/binarySearch/03_capacity-to-ship-packages-within-d-days/"/>
+      <url>/guaBlog/2022/10/27/algorithm/binarySearch/03_capacity-to-ship-packages-within-d-days/</url>
+      
+        <content type="html"><![CDATA[<h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><h4 id="在-D-天内送达包裹的能力"><a href="#在-D-天内送达包裹的能力" class="headerlink" title="在 D 天内送达包裹的能力"></a><a href="https://leetcode-cn.com/problems/capacity-to-ship-packages-within-d-days/">在 D 天内送达包裹的能力</a></h4><h2 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h2><blockquote><p>搜索区间为$[left, right]$，初始$left=max(weights)$，$right=sum(weights)$   </p><ul><li>能运送完，下一搜索区间$[left, mid-1]$   </li><li>不能送完，下一搜索区间$[mid+1, right]$    </li></ul></blockquote><h2 id="代码"><a href="#代码" class="headerlink" title="代码"></a>代码</h2><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Solution</span>:</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">shipWithinDays</span>(<span class="params">self, weights: <span class="type">List</span>[<span class="built_in">int</span>], days: <span class="built_in">int</span></span>) -&gt; <span class="built_in">int</span>:</span><br><span class="line"></span><br><span class="line">        <span class="keyword">def</span> <span class="title function_">can_finish</span>(<span class="params">w</span>):</span><br><span class="line">            cnt = <span class="number">0</span></span><br><span class="line">            temp = <span class="number">0</span></span><br><span class="line">            <span class="keyword">for</span> weight <span class="keyword">in</span> weights:</span><br><span class="line">                temp += weight</span><br><span class="line">                <span class="keyword">if</span> temp &gt; w:</span><br><span class="line">                    temp = weight</span><br><span class="line">                    cnt += <span class="number">1</span></span><br><span class="line">            <span class="keyword">if</span> temp:</span><br><span class="line">                cnt += <span class="number">1</span></span><br><span class="line">            <span class="keyword">return</span> cnt &lt;= days</span><br><span class="line"></span><br><span class="line">        left = <span class="built_in">max</span>(weights)</span><br><span class="line">        right = <span class="built_in">sum</span>(weights)</span><br><span class="line"></span><br><span class="line">        <span class="keyword">while</span> left &lt;= right:</span><br><span class="line">            mid = left + (right - left) // <span class="number">2</span></span><br><span class="line">            <span class="keyword">if</span> can_finish(mid):</span><br><span class="line">                right = mid - <span class="number">1</span></span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                left = mid + <span class="number">1</span></span><br><span class="line">        <span class="keyword">return</span> left</span><br><span class="line"></span><br></pre></td></tr></table></figure>]]></content>
+      
+      
+      <categories>
+          
+          <category> 没事撸撸算法 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 算法 </tag>
+            
+            <tag> leetcode </tag>
+            
+            <tag> 二分搜索 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
       <title>二分搜索-爱吃香蕉的珂珂</title>
       <link href="/guaBlog/2022/10/27/algorithm/binarySearch/02_koko-eating-bananas/"/>
       <url>/guaBlog/2022/10/27/algorithm/binarySearch/02_koko-eating-bananas/</url>
