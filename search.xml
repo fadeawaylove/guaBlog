@@ -4,6 +4,31 @@
   
     
     <entry>
+      <title>《Redis设计与实现》Part1:简单动态字符串</title>
+      <link href="/guaBlog/2022/10/28/read_redis/p01_c02_sds/"/>
+      <url>/guaBlog/2022/10/28/read_redis/p01_c02_sds/</url>
+      
+        <content type="html"><![CDATA[<blockquote><p>Redis 没有直接使用 C 语言的字符串表示，而是定义了一种称为 SDS(simple dynamic string)的类型，并作为 Redis 默认字符串的表示。那么 Redis 为什么要这么做呢？有什么好处呢？接下来咱们就探讨一下。</p></blockquote><h2 id="SDS-定义"><a href="#SDS-定义" class="headerlink" title="SDS 定义"></a>SDS 定义</h2><p><code>src/sds.h/sdshdr</code></p><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">sdshdr</span> &#123;</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 所保存的字符串长度</span></span><br><span class="line">    <span class="type">unsigned</span> <span class="type">int</span> len;</span><br><span class="line">    <span class="comment">// buf数组中未使用的字节数</span></span><br><span class="line">    <span class="type">unsigned</span> <span class="type">int</span> <span class="built_in">free</span>;</span><br><span class="line">    <span class="comment">// 字节数组，用于保存字符串</span></span><br><span class="line">    <span class="type">char</span> buf[];</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure><img src= "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-lazy-src="/guaBlog/2022/10/28/read_redis/p01_c02_sds/sdshdr01.jpg" class="" title="图2.1"><p>图 2.1 展示了一个字符串“Redis”的例子：</p><ul><li><code>len</code>为 5，是字符串“Redis”的长度，表示<code>SDS</code>保存了一个长度为 5 字节的字符串。</li><li><code>free</code>为 0，表示<code>SDS</code>无分配未使用的空间。</li><li><code>buf</code>是一个<code>char</code>类型的数组，数组前五个字节依次为<code>R</code>、<code>e</code>、<code>d</code>、<code>i</code>、<code>s</code>，最后一个字节为空字符<code>\0</code>。</li></ul><p>可以看到<code>SDS</code>遵循了<strong>C</strong>字符以空字符结尾的惯例，这么做的好处是可以重用一部分<strong>C</strong>字符串中的函数（比如<code>printf</code>）。</p><h2 id="SDS-优点"><a href="#SDS-优点" class="headerlink" title="SDS 优点"></a>SDS 优点</h2><p>传统<strong>C</strong>字符串使用长度为 N+1 的字符数组来表示 N 个字符，并以空字符<code>\0</code>结尾，这种简单的字符串表达方式并不能满足<strong>Redis</strong>对字符串的要求。</p><h3 id="获取字符串长度"><a href="#获取字符串长度" class="headerlink" title="获取字符串长度"></a>获取字符串长度</h3><ul><li>C 字符串需要遍历整个字符串，直到遇到空字符串<code>\0</code>，所以复杂度为<code>O(n)</code></li><li>SDS 直接访问属性<code>len</code>，复杂度为<code>O(1)</code></li></ul><h3 id="缓冲区溢出"><a href="#缓冲区溢出" class="headerlink" title="缓冲区溢出"></a>缓冲区溢出</h3><p><code>char *strcat(char *dest, const char *src)</code></p><ul><li>C 字符串执行拼接操作时，如未分配足够空间，则可能越界溢出到其它已经被使用的空间</li><li>SDS 执行<code>sdscat</code>函数用于字符串拼接，执行<code>sdscat</code>操作之前会自动检查 SDS 是否有足够空间，不够则会先对 SDS 空间进行扩展</li></ul><h3 id="减少内存分配次数"><a href="#减少内存分配次数" class="headerlink" title="减少内存分配次数"></a>减少内存分配次数</h3><p>内存调用是一个比较耗时的操作，涉及到复杂的算法以及可能执行系统调用，所以一半程序中，如果字符修改情况比较少，那么每次修改字符串则执行一次内存分配是可以接受的，但是在 redis 这种高性能数据库场景，必须要速度快同时数据会被频繁修改，如此一来，频繁执行内存调用进行内存的重分配则会对性能造成极大影响。</p><h4 id="strcat-场景"><a href="#strcat-场景" class="headerlink" title="strcat 场景"></a>strcat 场景</h4><p>假定字符串<strong>s</strong>值为“Redis”，现需要将<strong>s</strong>修改为“Redis Cluster”，如果是 C 字符串，则需要先分配增加至少 8 个字节的空间，再将字符串的实际值写入对应地址。那么 SDS 是如何应对这一场景的呢？</p><blockquote><p>SDS 通过<mark class="hl-label green">空间预分配</mark> ，也即当 SDS 通过 api 操作需要对 SDS 空间进行扩展的时候，SDS 不仅会分配所必须的空间，还会额外预先分配未使用的空间，从而达到减少内存分配次数的目的。</p></blockquote><p>分配公式：</p><ul><li>修改后如果 SDS 的长度（len 属性）小于 1M，那么则分配与 len 一样大小的未使用空间</li><li>修改后如果 SDS 的长度大于大于等于 1M，那么固定分配 1M 的未使用空间</li></ul><h4 id="缩短字符串"><a href="#缩短字符串" class="headerlink" title="缩短字符串"></a>缩短字符串</h4><p>如果要将字符串“Redis Cluster”缩短为“Redis”，SDS 会通过<mark class="hl-label green">惰性空间释放</mark> 的策略，保留字符串缩短后多余的空间，不会立即将其释放，只是更改 free 属性的值，记录当前 SDS 剩余可用空间的字节数。通过<mark class="hl-label green">惰性空间释放</mark> 策略，SDS 避免了字符串缩短时的重新空间分配操作，同时优化了后续字符串的增产操作。</p><h3 id="二进制安全"><a href="#二进制安全" class="headerlink" title="二进制安全"></a>二进制安全</h3><p>C 字符串必须符合某种编码，同时字符串中间不能有空字符串”\0”，这些限制使得 C 字符串只能保存文本数据，不能保存图像、音频、视频等二进制数据。</p><p>SDS 会用 buf 字节数据保存数据，对存放在 buf 中的数据都是以二进制的方式来处理，不会对其进行任何过滤、限制、假设，存进去是什么样，读取的时候就是怎么样。</p><h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>与 C 字符串相比，SDS 具有如下优点：</p><ul><li>$O(1)$复杂度获取字符串长度</li><li>杜绝缓冲区溢出</li><li>减少修改字符串时内存重新分配次数</li><li>二进制安全</li><li>兼容部分 C 字符串函数</li></ul>]]></content>
+      
+      
+      <categories>
+          
+          <category> 读书笔记 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> Redis设计与实现 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
       <title>在排序数组中查找元素的第一个和最后一个位置</title>
       <link href="/guaBlog/2022/10/28/algorithm/binarySearch/05_find-first-and-last-position-of-element-in-sorted-array/"/>
       <url>/guaBlog/2022/10/28/algorithm/binarySearch/05_find-first-and-last-position-of-element-in-sorted-array/</url>
